@@ -1,0 +1,52 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - mynet
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}?options=-csearch_path%3Demployees
+      - DB_POOL_MIN_SIZE=${POOL_MIN_SIZE:-3}
+      - DB_POOL_MAX_SIZE=${POOL_MAX_SIZE:-10}
+    restart: unless-stopped
+    deploy:
+      replicas: ${API_REPLICAS:-1}
+      resources:
+        limits:
+          memory: 256M
+          cpus: 0.2
+        reservations:
+          memory: 256M
+          cpus: 0.2
+  postgres:
+    image: postgres:14.18
+    ports:
+      - "5432:5432"
+    networks:
+      - mynet
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+    volumes:
+      - .data/postgres:/var/lib/postgresql/data
+      - ./employees.sql.gz:/docker-entrypoint-initdb.d/employees.sql.gz
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: 0.25
+        reservations:
+          memory: 256M
+          cpus: 0.25
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+networks:
+  mynet:
